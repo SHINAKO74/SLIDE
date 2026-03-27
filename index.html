@@ -459,7 +459,7 @@
   </div>
 </div>
 
-<div id="think" style="font-size:0.65rem;letter-spacing:0.14em;color:var(--muted);min-height:1em;"></div>
+<div id="think" style="font-size:0.65rem;letter-spacing:0.14em;color:var(--muted);height:1em;visibility:hidden;">thinking...</div>
 
 <footer>
   <button id="reset-btn">
@@ -492,9 +492,63 @@ function getCell() {
   return Math.min(CELL_PX, window.innerHeight * 0.115, window.innerWidth * 0.115) + 1;
 }
 
+// ===== AUDIO =====
+const SE = {
+  ctx: null,
+  init() {
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  tone(freq, type, duration, vol = 0.08, delay = 0) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration);
+  },
+  select() {
+    this.init();
+    this.tone(600, 'sine', 0.08, 0.06);
+  },
+  move() {
+    this.init();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.linearRampToValueAtTime(440, t + 0.2);
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + 0.25);
+  },
+  win() {
+    this.init();
+    [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 'triangle', 0.5, 0.08, i * 0.12));
+  },
+  reset() {
+    this.init();
+    this.tone(400, 'sine', 0.05, 0.05);
+    this.tone(300, 'sine', 0.08, 0.05, 0.06);
+  },
+};
+
 let board, selected, turn, gameOver, moving;
 let cpuMode = false;
 let difficulty = 'normal';
+let boardHistory = []; // 過去10ターンの盤面履歴
+
+function boardToKey(b) {
+  return b.map(row => row.map(p => p ? p.team[0] + (p.isKing ? 'K' : '') : '.').join('')).join('|');
+}
 
 function setMode(m) {
   cpuMode = m === 'cpu';
@@ -519,10 +573,10 @@ const HUMAN = 'white', AI = 'black';
 function cpuMove() {
   if (gameOver || turn !== 'black') return;
   moving = true;
-  document.getElementById('think').textContent = 'thinking...';
+  document.getElementById('think').style.visibility = 'visible';
   setTimeout(() => {
     const m = bestAIMove();
-    document.getElementById('think').textContent = '';
+    document.getElementById('think').style.visibility = 'hidden';
     if (!m) { moving = false; return; }
     animateMove(m.sr, m.sc, m.tr, m.tc);
   }, 50);
@@ -533,9 +587,12 @@ function bestAIMove() {
   if (!moves.length) return null;
   for (const m of moves) { if (isWin(applyMove(board, m), AI)) return m; }
   const ordered = orderMoves(moves, board);
+  // 履歴と被る手を除外
+  const filtered = ordered.filter(m => !boardHistory.includes(boardToKey(applyMove(board, m))));
+  const candidates = filtered.length > 0 ? filtered : ordered;
   let best = -Infinity, bestMoves = [];
   const depth = { easy: 1, normal: 3, hard: 5 }[difficulty] || 3;
-  for (const m of ordered) {
+  for (const m of candidates) {
     const score = minimax(applyMove(board, m), depth - 1, -Infinity, Infinity, false);
     if (score > best) { best = score; bestMoves = [m]; }
     else if (score === best) bestMoves.push(m);
@@ -678,12 +735,14 @@ function checkWinner(b) {
 }
 
 function resetGame() {
+  SE.reset();
   moving = true;
   animateReset(() => {
     board = Array.from({length: ROWS}, () => Array(COLS).fill(null));
     for (let c = 0; c < 7; c++) board[0][c] = { team: 'black', isKing: c === 3 };
     for (let c = 0; c < 7; c++) board[6][c] = { team: 'white', isKing: c === 3 };
     selected = null; turn = 'white'; gameOver = false; moving = false;
+    boardHistory = [];
     const overlayEl = document.getElementById('overlay');
     overlayEl.classList.remove('show');
     overlayEl.style.transform = '';
@@ -815,11 +874,12 @@ function onCellClick(r, c) {
     selected = null;
   }
 
-  if (piece?.team === turn) selected = [r, c];
+  if (piece?.team === turn) { selected = [r, c]; SE.select(); }
   render();
 }
 
 function animateMove(sr, sc, tr, tc) {
+  SE.init(); SE.move();
   moving = true;
   const boardEl = document.getElementById('board');
   const cells = boardEl.querySelectorAll('.cell');
@@ -853,6 +913,10 @@ function commitMove(sr, sc, tr, tc) {
   selected = null;
   moving = false;
 
+  // 履歴に追加（最新10件）
+  boardHistory.push(boardToKey(board));
+  if (boardHistory.length > 10) boardHistory.shift();
+
   const center = board[CENTER[0]][CENTER[1]];
   if (center?.isKing) {
     gameOver = true;
@@ -877,6 +941,7 @@ function commitMove(sr, sc, tr, tc) {
         overlayEl.style.transform = 'rotate(0deg)';
       }
       overlayEl.classList.add('show');
+      SE.win();
     }, 500);
     return;
   }
@@ -944,7 +1009,7 @@ function startHold(e) {
   holdTimer = setTimeout(() => {
     cancelAnimationFrame(rafId);
     resetProgress.style.width = '100%';
-    setTimeout(() => { resetProgress.style.width = '0%'; resetGame(); }, 100);
+    setTimeout(() => { resetProgress.style.width = '0%'; SE.init(); SE.reset(); resetGame(); }, 100);
   }, HOLD_MS);
 }
 
@@ -968,6 +1033,7 @@ resetBtn.addEventListener('mouseleave', cancelHold);
 resetBtn.addEventListener('touchend', cancelHold);
 resetBtn.addEventListener('touchcancel', cancelHold);
 
+// ===== AUDIO =====
 resetGame();
 </script>
 </body>
