@@ -29,7 +29,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 8px;
     padding: 16px;
     user-select: none;
   }
@@ -42,7 +42,7 @@
   }
 
   h1 {
-    font-size: 1.1rem;
+    font-size: 1.8rem;
     font-weight: 500;
     letter-spacing: 0.4em;
     color: var(--bright);
@@ -166,6 +166,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 12px;
   }
 
   #reset-btn {
@@ -173,14 +174,28 @@
     border: 1px solid var(--line);
     color: var(--muted);
     font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.9rem;
     letter-spacing: 0.2em;
-    padding: 7px 16px;
+    padding: 12px 24px;
     cursor: pointer;
     transition: border-color 0.15s, color 0.15s;
   }
 
   #reset-btn:hover { border-color: var(--mid); color: var(--text); }
+
+  #help-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  #help-btn:hover { border-color: var(--mid); color: var(--text); }
 
   /* point-symmetric icon: circular arrows */
   #reset-btn svg {
@@ -293,6 +308,111 @@
   }
 
   #overlay.show #overlay-btn { opacity: 1; }
+
+  #rules-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+
+  #rules-overlay.show { opacity: 1; pointer-events: all; }
+
+  #rules-box {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 28px 40px;
+    max-width: 520px;
+    width: 90%;
+    position: relative;
+  }
+
+  #rules-box h2 {
+    font-size: 1.5rem;
+    letter-spacing: 0.4em;
+    color: var(--bright);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  #rules-box p, #rules-box li {
+    font-size: 1.1rem;
+    line-height: 2.2;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  #rules-box {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 28px 40px;
+    width: auto;
+    position: relative;
+  }
+
+  #rules-box ul { padding-left: 14px; margin-bottom: 14px; }
+
+  #rules-close {
+    position: absolute;
+    top: 12px; right: 14px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0;
+  }
+
+  #rules-close:hover { color: var(--bright); }
+
+  #reset-btn {
+    position: relative;
+    overflow: hidden;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  #reset-btn:hover { border-color: var(--mid); color: var(--text); }
+
+  #help-btn:hover { border-color: var(--mid); color: var(--text); }
+
+  footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  #reset-progress {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: rgba(240,240,240,0.15);
+    transition: none;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 0;
+  }
+
+  #reset-btn span {
+    position: relative;
+    z-index: 1;
+  }
 </style>
 </head>
 <body>
@@ -321,10 +441,25 @@
 <div id="think" style="font-size:0.65rem;letter-spacing:0.14em;color:var(--muted);min-height:1em;"></div>
 
 <footer>
-  <button id="reset-btn" onclick="resetGame()">
-    reset
+  <button id="reset-btn">
+    <div id="reset-progress"></div>
+    <span>reset</span>
   </button>
+  <button id="help-btn" onclick="toggleRules()">rule</button>
 </footer>
+
+<div id="rules-overlay" onclick="toggleRules()">
+  <div id="rules-box" onclick="event.stopPropagation()">
+    <button id="rules-close" onclick="toggleRules()">✕</button>
+    <h2>RULE</h2>
+    <ul>
+      <li>2人のプレイヤーが交互に手番を行う</li>
+      <li>駒は縦・横・斜めに壁か駒にぶつかるまで動かせる</li>
+      <li>王（点があるやつ）を盤面の中央に移動させたら勝ち</li>
+      <li>王以外の駒は中央マスに止まることができない</li>
+    </ul>
+  </div>
+</div>
 
 
 
@@ -768,6 +903,47 @@ function render() {
 
 
 }
+
+function toggleRules() {
+  document.getElementById('rules-overlay').classList.toggle('show');
+}
+
+// long-press reset
+const resetBtn = document.getElementById('reset-btn');
+const resetProgress = document.getElementById('reset-progress');
+const HOLD_MS = 600;
+let holdTimer = null, holdStart = null, rafId = null;
+
+function startHold(e) {
+  e.preventDefault();
+  holdStart = Date.now();
+  rafId = requestAnimationFrame(updateProgress);
+  holdTimer = setTimeout(() => {
+    cancelAnimationFrame(rafId);
+    resetProgress.style.width = '100%';
+    setTimeout(() => { resetProgress.style.width = '0%'; resetGame(); }, 100);
+  }, HOLD_MS);
+}
+
+function updateProgress() {
+  const pct = Math.min((Date.now() - holdStart) / HOLD_MS * 100, 100);
+  resetProgress.style.width = pct + '%';
+  if (pct < 100) rafId = requestAnimationFrame(updateProgress);
+}
+
+function cancelHold() {
+  clearTimeout(holdTimer);
+  cancelAnimationFrame(rafId);
+  holdTimer = holdStart = null;
+  resetProgress.style.width = '0%';
+}
+
+resetBtn.addEventListener('mousedown', startHold);
+resetBtn.addEventListener('touchstart', startHold, { passive: false });
+resetBtn.addEventListener('mouseup', cancelHold);
+resetBtn.addEventListener('mouseleave', cancelHold);
+resetBtn.addEventListener('touchend', cancelHold);
+resetBtn.addEventListener('touchcancel', cancelHold);
 
 resetGame();
 </script>
