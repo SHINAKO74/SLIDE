@@ -95,8 +95,29 @@
 
   .cell.selected { background: var(--surface); }
 
-  .cell.active-row { background: #181818; }
+  .cell.active-row .piece:not(.sliding) {
+    animation: piecePulse 1.4s ease-in-out infinite;
+  }
 
+  #board.has-selection .cell.active-row:not(.selected) .piece:not(.sliding) {
+    animation: none;
+  }
+
+  .cell.selected .piece {
+    outline: 1.5px solid var(--bright);
+    outline-offset: 4px;
+    animation: pulse 1.2s ease-in-out infinite !important;
+  }
+
+  @keyframes pulse {
+    0%,100% { outline-offset: 4px; outline-color: rgba(240,240,240,0.9); }
+    50%      { outline-offset: 7px; outline-color: rgba(240,240,240,0.2); }
+  }
+
+  @keyframes piecePulse {
+    0%,100% { box-shadow: 0 0 0 0px rgba(240,240,240,0); }
+    50%      { box-shadow: 0 0 0 4px rgba(240,240,240,0.25); }
+  }
 
   .cell.reachable::after {
     content: '';
@@ -874,6 +895,8 @@ function render() {
   const overlay = document.getElementById('overlay');
   boardEl.innerHTML = '';
   boardEl.appendChild(overlay);
+
+  boardEl.classList.toggle('has-selection', !!selected);
 
   const reachable = selected ? getReachable(selected[0], selected[1]) : [];
 
